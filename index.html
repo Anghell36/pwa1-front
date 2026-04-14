@@ -741,61 +741,97 @@ function cerrarModalPago() {
 
 /* ─── CONFIRMAR PAGO ─────────────────────────────────────────── */
 async function confirmarPago() {
+    /* ─── CONFIGURACIÓN DE APIS (AQUÍ VAN TUS DATOS) ─────────────────────── */
+// 1. Pon tu Clave PÚBLICA de Stripe
+const stripeInstance = Stripe('pk_test_51T2ymfGTQu1cMhAHq1rupNpg7cadOsRLcnsMenfjXyb28wWnp6PNIgFyICickjSQUrUHLiC3TLlzDjWBqZDU5rHH00CFPexfLX'); 
+// 2. Pon la URL que te dio Vercel en el paso anterior + /api/checkout
+const BACKEND_URL = 'https://pwa1-backend.vercel.app/';
+
+let elements;
+let cardElement;
+
+/* ─── INICIALIZAR STRIPE ─────────────────────────────────────── */
+function initStripe() {
+    if (!elements) {
+        elements = stripeInstance.elements();
+        cardElement = elements.create('card', {
+            style: {
+                base: { fontSize: '16px', color: '#444' }
+            }
+        });
+        cardElement.mount('#card-element'); // Esto inyecta el input de tarjeta en tu HTML
+    }
+}
+
+/* ─── ABRIR MODAL PAGO ─────────────────────────────────────── */
+// Modificamos tu función existente para que inicialice Stripe al abrir
+function abrirModalPago() {
+    if (carrito.length === 0) return;
+    document.getElementById('pay-overlay').classList.add('open');
+    document.getElementById('btn-pagar-total').innerText = fmt(getTotal());
+    initStripe(); 
+}
+
+/* ─── CONFIRMAR PAGO REAL ─────────────────────────────────────── */
+async function confirmarPago() {
     const nombre = document.getElementById('pay-nombre').value.trim();
     const email  = document.getElementById('pay-email').value.trim();
 
-    if (!nombre) { document.getElementById('pay-nombre').focus(); setStripeError('Por favor ingresa tu nombre completo.'); return; }
-    if (!email || !/\S+@\S+\.\S+/.test(email)) { document.getElementById('pay-email').focus(); setStripeError('Ingresa un correo electrónico válido.'); return; }
+    if (!nombre || !email) {
+        alert("Ingresa nombre y correo para continuar.");
+        return;
+    }
 
-    const btn     = document.getElementById('btn-pagar-ahora');
-    const btnText = document.getElementById('btn-pagar-texto');
-    btn.disabled  = true;
-    btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Procesando…';
-    setStripeError(null);
+    const btn = document.getElementById('btn-pagar-ahora');
+    btn.disabled = true;
+    btn.innerHTML = 'Procesando...';
 
     try {
-        /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-           FLUJO REAL — descomenta cuando tengas tu API en Vercel:
+        // 1. Llamar a Vercel
+        const res = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                items: carrito,
+                nombre: nombre,
+                email: email,
+                total: getTotal()
+            })
+        });
 
-           Paso 1 — Pedir PaymentIntent a tu endpoint:
-           const res = await fetch('/api/create-payment-intent', {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({
-                   items: carrito,
-                   email, nombre,
-                   factura: document.getElementById('req-factura').checked,
-                   rfc:    document.getElementById('pay-rfc')?.value,
-                   razon:  document.getElementById('pay-razon')?.value,
-                   cfdi:   document.getElementById('pay-cfdi')?.value,
-               })
-           });
-           if (!res.ok) throw new Error((await res.json()).error || 'Error del servidor');
-           const { clientSecret } = await res.json();
+        const data = await res.json();
+        
+        // 2. Confirmar el pago con Stripe
+        const result = await stripeInstance.confirmCardPayment(data.clientSecret, {
+            payment_method: {
+                card: cardElement,
+                billing_details: { name: nombre, email: email }
+            }
+        });
 
-           Paso 2 — Confirmar con Stripe.js (sin redireccionamiento):
-           const { error, paymentIntent } = await stripeInstance.confirmCardPayment(clientSecret, {
-               payment_method: {
-                   card: cardNumber,
-                   billing_details: { name: nombre, email }
-               }
-           });
-           if (error) throw new Error(error.message);
-           if (paymentIntent.status === 'succeeded') {
-               mostrarConfirmacion(paymentIntent.id.slice(-8).toUpperCase());
-           }
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-
-        // SIMULACIÓN — elimina esto cuando conectes el backend real
-        await new Promise(r => setTimeout(r, 1900));
-        const orderId = Math.random().toString(36).slice(2,8).toUpperCase();
-        mostrarConfirmacion(orderId);
+        if (result.error) {
+            alert(result.error.message);
+            btn.disabled = false;
+            btn.innerHTML = 'Pagar Ahora';
+        } else if (result.paymentIntent.status === 'succeeded') {
+            cerrarModalPago();
+            mostrarConfirmacion("EXITO-" + result.paymentIntent.id.slice(-5));
+        }
 
     } catch (err) {
-        setStripeError(err.message || 'Error al procesar el pago. Intenta de nuevo.');
-        btn.disabled  = false;
-        btnText.innerHTML = `<i class="fa-solid fa-lock text-sm mr-1"></i> Pagar <span id="btn-pagar-total">${fmt(getTotal())}</span>`;
+        alert("Hubo un error de conexión.");
+        btn.disabled = false;
+        btn.innerHTML = 'Pagar Ahora';
     }
+}
+
+/* ─── REGISTRAR PWA ─────────────────────────────────────── */
+// Esto hace que tu sw.js despierte y la app se pueda instalar
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+    });
+}
 }
 
 /* ─── CONFIRMACIÓN ───────────────────────────────────────────── */
