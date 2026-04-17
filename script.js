@@ -229,7 +229,7 @@ function initStripe() {
     if (stripe) return; // Ya está inicializado
 
     // ⚠️ REEMPLAZA con tu clave pública real de Stripe
-    stripe = Stripe('pk_test_51T2ymfGTQu1cMhAHq1rupNpg7cadOsRLcnsMenfjXyb28wWnp6PNIgFyICickjSQUrUHLiC3TLlzDjWBqZDU5rHH00CFPexfLX');
+    stripe = Stripe('pk_live_51T2ym6KAlznmQqyQyn539mGH6MMenT7ZkokZMNHYYku0tD5wqEEnPUN4tIbIAQzdcXIxA4brkkvt5hsBz3pvnwD000sPTsHHOO');
 
     elements = stripe.elements({
         fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap' }]
