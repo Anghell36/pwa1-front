@@ -6,16 +6,18 @@
   "display": "standalone",
   "background_color": "#fafaf9",
   "theme_color": "#f59e0b",
-  "icons": [
+"icons": [
     {
-      "src": "/pwa1-front/icon-192x192.png",
+      "src": "https://ui-avatars.com/api/?name=Q&background=F59E0B&color=fff&size=192&bold=true",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/pwa1-front/icon-512x512.png",
+      "src": "https://ui-avatars.com/api/?name=Q&background=F59E0B&color=fff&size=512&bold=true",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
