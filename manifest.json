@@ -1,6 +1,6 @@
 {
   "name": "El Quesillo",
-  "short_name": "Quesillo",
+  "short_name": "El Quesillo",
   "description": "Tacos de alambre y hamburguesas con queso.",
   "start_url": "/pwa1-front/index.html",
   "display": "standalone",
