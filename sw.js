@@ -2,7 +2,8 @@ const CACHE_NAME = 'quesillo-v1';
 const urlsToCache = [
   '/pwa1-front/',
   '/pwa1-front/index.html',
-  '/pwa1-front/manifest.json'
+  '/pwa1-front/manifest.json',
+  '/pwa1-front/script.js'
 ];
 
 // Instalación del Service Worker

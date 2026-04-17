@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         const swPath = '/pwa1-front/sw.js'; 
-        navigator.serviceWorker.register(swPath, { scope: '/' })
+        navigator.serviceWorker.register(swPath, { scope: '/pwa1-front/' })
             .then(reg => console.log('SW registrado:', reg.scope))
             .catch(err => console.error('SW no registrado:', err));
     });
