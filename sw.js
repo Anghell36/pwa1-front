@@ -1,9 +1,8 @@
 const CACHE_NAME = 'quesillo-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-  // Aquí puedes agregar rutas a tus imágenes o iconos locales si los descargas
+  '/pwa1-front/',
+  '/pwa1-front/index.html',
+  '/pwa1-front/manifest.json'
 ];
 
 // Instalación del Service Worker
