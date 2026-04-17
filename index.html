@@ -474,6 +474,8 @@ let catActual      = 'Todos';
 let stripeInstance = null;
 let cardNumber = null, cardExpiry = null, cardCvc = null;
 
+const BACKEND_URL = 'https://pwa1-backend.vercel.app/api/checkout';
+
 /* ─── HELPERS ────────────────────────────────────────────────── */
 const fmt        = n => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n);
 const getTotal   = () => carrito.reduce((s,i) => s + i.precio * i.cantidad, 0);
@@ -664,18 +666,21 @@ function toggleCart() {
 
 /* ─── STRIPE ELEMENTS ────────────────────────────────────────── */
 function initStripe() {
-    if (cardNumber) return;
+    if (stripe) return; // Ya está inicializado
 
-    // ⚠️ REEMPLAZA con tu Publishable Key de Stripe Dashboard
-    stripeInstance = Stripe('pk_test_REEMPLAZA_CON_TU_PUBLISHABLE_KEY');
+    // ⚠️ REEMPLAZA con tu clave pública real de Stripe
+    stripe = Stripe('pk_test_51T2ymfGTQu1cMhAHq1rupNpg7cadOsRLcnsMenfjXyb28wWnp6PNIgFyICickjSQUrUHLiC3TLlzDjWBqZDU5rHH00CFPexfLX');
 
-    const elements = stripeInstance.elements({
+    elements = stripe.elements({
         fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap' }]
     });
+
     const style = {
         base: {
-            fontFamily: 'Outfit, sans-serif', fontSize: '15px',
-            color: '#1C1917', fontWeight: '500',
+            fontFamily: 'Outfit, sans-serif',
+            fontSize: '15px',
+            color: '#1C1917',
+            fontWeight: '500',
             '::placeholder': { color: '#A8A29E' }
         },
         invalid: { color: '#EF4444', iconColor: '#EF4444' }
@@ -683,7 +688,7 @@ function initStripe() {
 
     cardNumber = elements.create('cardNumber', { style, showIcon: true });
     cardExpiry = elements.create('cardExpiry', { style });
-    cardCvc    = elements.create('cardCvc',    { style });
+    cardCvc = elements.create('cardCvc', { style });
 
     cardNumber.mount('#stripe-card-number');
     cardExpiry.mount('#stripe-card-expiry');
@@ -692,45 +697,57 @@ function initStripe() {
     const fields = [
         { el: cardNumber, id: 'stripe-card-number' },
         { el: cardExpiry, id: 'stripe-card-expiry' },
-        { el: cardCvc,    id: 'stripe-card-cvc' },
+        { el: cardCvc, id: 'stripe-card-cvc' }
     ];
+
     fields.forEach(({ el, id }) => {
-        const c = document.getElementById(id);
-        el.on('focus',  () => c.classList.add('focused'));
-        el.on('blur',   () => c.classList.remove('focused'));
-        el.on('change', e => {
-            c.classList.toggle('invalid', !!e.error);
-            setStripeError(e.error ? e.error.message : null);
+        const container = document.getElementById(id);
+        el.on('focus', () => container.classList.add('focused'));
+        el.on('blur', () => container.classList.remove('focused'));
+        el.on('change', (event) => {
+            container.classList.toggle('invalid', !!event.error);
+            setStripeError(event.error ? event.error.message : null);
         });
     });
 }
 
 function setStripeError(msg) {
     const box = document.getElementById('stripe-error');
-    if (msg) { document.getElementById('stripe-error-msg').textContent = msg; box.classList.remove('hidden'); }
-    else box.classList.add('hidden');
+    const msgSpan = document.getElementById('stripe-error-msg');
+    if (msg) {
+        msgSpan.textContent = msg;
+        box.classList.remove('hidden');
+    } else {
+        box.classList.add('hidden');
+    }
 }
+
+/* ─── ABRIR MODAL PAGO ───────────────────────────────────────── */
 
 function abrirModalPago() {
     if (!carrito.length) return;
+
     const total = getTotal();
     const factura = document.getElementById('req-factura').checked;
 
     document.getElementById('rfc-section').classList.toggle('hidden', !factura);
     document.getElementById('pay-total-display').textContent = fmt(total);
-    document.getElementById('btn-pagar-total').textContent   = fmt(total);
+    document.getElementById('btn-pagar-total').textContent = fmt(total);
 
-    document.getElementById('pay-items-preview').innerHTML = carrito.slice(0,4).map(i =>
+    // Previsualización de productos
+    const preview = document.getElementById('pay-items-preview');
+    preview.innerHTML = carrito.slice(0, 4).map(i =>
         `<img src="${i.img}" class="w-10 h-10 rounded-xl object-cover border-2 border-white shadow-sm" onerror="this.src='${fallbackImg}'">`
     ).join('');
 
-    // Cerrar carrito primero
+    // Cerrar carrito si está abierto
     document.getElementById('cart-overlay').classList.remove('open');
-
-    // Abrir modal pago
-    const ov = document.getElementById('pay-overlay');
-    ov.classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // Mostrar modal
+    document.getElementById('pay-overlay').classList.add('open');
+
+    // Inicializar Stripe (solo una vez)
     initStripe();
 }
 
@@ -742,119 +759,98 @@ function cerrarModalPago() {
 
 /* ─── CONFIRMAR PAGO ─────────────────────────────────────────── */
 async function confirmarPago() {
-    /* ─── CONFIGURACIÓN DE APIS (AQUÍ VAN TUS DATOS) ─────────────────────── */
-// 1. Pon tu Clave PÚBLICA de Stripe
-const stripeInstance = Stripe('pk_test_51T2ymfGTQu1cMhAHq1rupNpg7cadOsRLcnsMenfjXyb28wWnp6PNIgFyICickjSQUrUHLiC3TLlzDjWBqZDU5rHH00CFPexfLX'); 
-// 2. Pon la URL que te dio Vercel en el paso anterior + /api/checkout
-const BACKEND_URL = 'https://pwa1-backend.vercel.app/';
-
-let elements;
-let cardElement;
-
-/* ─── INICIALIZAR STRIPE ─────────────────────────────────────── */
-function initStripe() {
-    if (!elements) {
-        elements = stripeInstance.elements();
-        cardElement = elements.create('card', {
-            style: {
-                base: { fontSize: '16px', color: '#444' }
-            }
-        });
-        cardElement.mount('#card-element'); // Esto inyecta el input de tarjeta en tu HTML
-    }
-}
-
-/* ─── ABRIR MODAL PAGO ─────────────────────────────────────── */
-// Modificamos tu función existente para que inicialice Stripe al abrir
-function abrirModalPago() {
-    if (carrito.length === 0) return;
-    document.getElementById('pay-overlay').classList.add('open');
-    document.getElementById('btn-pagar-total').innerText = fmt(getTotal());
-    initStripe(); 
-}
-
-/* ─── CONFIRMAR PAGO REAL ─────────────────────────────────────── */
-async function confirmarPago() {
     const nombre = document.getElementById('pay-nombre').value.trim();
-    const email  = document.getElementById('pay-email').value.trim();
+    const email = document.getElementById('pay-email').value.trim();
 
     if (!nombre || !email) {
-        alert("Ingresa nombre y correo para continuar.");
+        alert('Por favor ingresa tu nombre y correo electrónico.');
         return;
     }
 
     const btn = document.getElementById('btn-pagar-ahora');
+    const btnText = document.getElementById('btn-pagar-texto');
+    const originalText = btnText.innerHTML;
+
     btn.disabled = true;
-    btn.innerHTML = 'Procesando...';
+    btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
 
     try {
-        // 1. Llamar a Vercel
-        const res = await fetch(BACKEND_URL, {
+        // 1. Llamar al backend para crear el PaymentIntent
+        const response = await fetch(BACKEND_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 items: carrito,
-                nombre: nombre,
-                email: email,
-                total: getTotal()
+                nombre,
+                email,
+                total: getTotal(),
+                // Puedes enviar RFC y razón social si quieres guardarlos en BD
+                rfc: document.getElementById('pay-rfc').value,
+                razonSocial: document.getElementById('pay-razon').value,
+                usoCFDI: document.getElementById('pay-cfdi').value
             })
         });
 
-        const data = await res.json();
-        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Error del servidor');
+        }
+
+        const { clientSecret } = await response.json();
+
         // 2. Confirmar el pago con Stripe
-        const result = await stripeInstance.confirmCardPayment(data.clientSecret, {
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
             payment_method: {
-                card: cardElement,
-                billing_details: { name: nombre, email: email }
+                card: cardNumber,
+                billing_details: {
+                    name: nombre,
+                    email: email
+                }
             }
         });
 
-        if (result.error) {
-            alert(result.error.message);
-            btn.disabled = false;
-            btn.innerHTML = 'Pagar Ahora';
-        } else if (result.paymentIntent.status === 'succeeded') {
-            cerrarModalPago();
-            mostrarConfirmacion("EXITO-" + result.paymentIntent.id.slice(-5));
+        if (error) {
+            throw new Error(error.message);
         }
 
-    } catch (err) {
-        alert("Hubo un error de conexión.");
+        if (paymentIntent.status === 'succeeded') {
+            // Pago exitoso
+            cerrarModalPago();
+            mostrarConfirmacion(paymentIntent.id.slice(-8));
+        }
+    } catch (error) {
+        alert('Error al procesar el pago: ' + error.message);
+        setStripeError(error.message);
+    } finally {
         btn.disabled = false;
-        btn.innerHTML = 'Pagar Ahora';
+        btnText.innerHTML = originalText;
     }
-}
-
-/* ─── REGISTRAR PWA ─────────────────────────────────────── */
-// Esto hace que tu sw.js despierte y la app se pueda instalar
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js');
-    });
-}
 }
 
 /* ─── CONFIRMACIÓN ───────────────────────────────────────────── */
 function mostrarConfirmacion(orderId) {
-    cerrarModalPago();
     document.getElementById('confirm-order-id').textContent = '#ORD-' + orderId;
     const ov = document.getElementById('confirm-overlay');
-    ov.classList.remove('hidden'); ov.classList.add('flex');
+    ov.classList.remove('hidden');
+    ov.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 
 function cerrarConfirmacion() {
     const ov = document.getElementById('confirm-overlay');
-    ov.classList.add('hidden'); ov.classList.remove('flex');
+    ov.classList.add('hidden');
+    ov.classList.remove('flex');
     document.body.style.overflow = '';
     carrito = [];
     actualizarUI();
     reRender();
-    ['pay-nombre','pay-tel','pay-email','pay-rfc','pay-razon'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+    // Limpiar formulario
+    ['pay-nombre', 'pay-tel', 'pay-email', 'pay-rfc', 'pay-razon'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
     document.getElementById('req-factura').checked = false;
+    document.getElementById('rfc-section').classList.add('hidden');
 }
 
 /* ─── INIT ───────────────────────────────────────────────────── */
@@ -862,19 +858,30 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMenu(menuData);
     actualizarUI();
 
-    // Escape key
-    document.addEventListener('keydown', e => {
-        if (e.key !== 'Escape') return;
-        if (document.getElementById('confirm-overlay').classList.contains('flex')) { cerrarConfirmacion(); return; }
-        if (document.getElementById('pay-overlay').classList.contains('open'))     { cerrarModalPago();    return; }
-        if (document.getElementById('cart-overlay').classList.contains('open'))    { toggleCart();         return; }
-    });
-
-    // Checkbox factura — mostrar/ocultar RFC en tiempo real si el modal ya está abierto
+    // Evento para mostrar/ocultar sección RFC
     document.getElementById('req-factura').addEventListener('change', e => {
         document.getElementById('rfc-section').classList.toggle('hidden', !e.target.checked);
     });
+
+    // Cerrar modales con ESC
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        if (document.getElementById('confirm-overlay').classList.contains('flex')) {
+            cerrarConfirmacion();
+        } else if (document.getElementById('pay-overlay').classList.contains('open')) {
+            cerrarModalPago();
+        } else if (document.getElementById('cart-overlay').classList.contains('open')) {
+            toggleCart();
+        }
+    });
 });
+
+// Registrar Service Worker para PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW no registrado:', err));
+    });
+}
 </script>
 </body>
 </html>
